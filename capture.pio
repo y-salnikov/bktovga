@@ -1,0 +1,44 @@
+
+
+.pio_version 0 // only requires PIO version 0
+.program capture
+
+.wrap_target
+		pull block
+		out	x,16
+skip:	wait 1 gpio 6
+		wait 0 gpio 6
+		jmp x-- skip
+		mov x,osr
+cap:	wait 1 gpio 6
+		in	pins, 1
+		wait 0 gpio 6
+		jmp x-- cap
+		wait 1 gpio 8
+		irq	set 2
+		wait 0 gpio 8
+		irq set 3
+.wrap
+
+
+% c-sdk {
+#include "hardware/clocks.h"
+
+static inline void capture_program_init(PIO pio,uint sm, uint offset, uint pin)
+{
+	pio_gpio_init(pio, pin);
+	pio_gpio_init(pio, pin+1);
+	pio_gpio_init(pio, pin+2);
+
+    pio_sm_set_consecutive_pindirs(pio, sm, pin, 3, false);
+    pio_sm_config c = capture_program_get_default_config(offset);
+    sm_config_set_in_pin_base(&c, pin+1);
+    sm_config_set_in_pin_count(&c, 1);
+	sm_config_set_in_shift(&c,true,true,32); // shift right
+	sm_config_set_out_shift(&c,true,false,32); // shift right
+    sm_config_set_clkdiv(&c, 1);
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+}
+
+%}

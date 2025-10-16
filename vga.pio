@@ -1,0 +1,86 @@
+
+.pio_version 0 // only requires PIO version 0
+.program vga_clk
+
+.wrap_target
+		irq set 4
+		irq clear 4
+.wrap
+
+
+% c-sdk {
+#include "hardware/clocks.h"
+
+static inline void vga_clk_program_init(PIO pio,uint sm, uint offset)
+{
+    pio_sm_config c = vga_clk_program_get_default_config(offset);
+    sm_config_set_clkdiv(&c, 2);
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+}
+
+%}
+
+.program vga_sync
+.wrap_target
+		pull block
+		out pins,3
+		mov x,osr
+loop:	wait 1 irq 4
+		wait 0 irq 4
+		jmp x-- loop
+.wrap
+
+% c-sdk {
+#include "hardware/clocks.h"
+
+static inline void vga_sync_program_init(PIO pio,uint sm, uint offset, uint pin)
+{
+	pio_gpio_init(pio, pin);
+	pio_gpio_init(pio, pin+1);
+	pio_gpio_init(pio, pin+2);
+
+    pio_sm_config c = vga_sync_program_get_default_config(offset);
+    pio_sm_set_consecutive_pindirs(pio, sm, pin, 3, true);
+	sm_config_set_out_pins(&c, pin,3);
+	sm_config_set_out_shift(&c,true,false,32); // shift right
+
+    sm_config_set_clkdiv(&c, 1);
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+}
+
+%}
+
+.program vga_px
+		pull block
+.wrap_target
+loop:	wait 1 irq 4
+		jmp pin data
+		set	pins,0
+		jmp	loop
+data:   out pins,4
+.wrap
+
+% c-sdk {
+#include "hardware/clocks.h"
+
+static inline void vga_px_program_init(PIO pio,uint sm, uint offset, uint pin)
+{
+	pio_gpio_init(pio, pin);
+	pio_gpio_init(pio, pin+1);
+	pio_gpio_init(pio, pin+2);
+
+    pio_sm_config c = vga_px_program_get_default_config(offset);
+    pio_sm_set_consecutive_pindirs(pio, sm, pin, 3, true);
+	sm_config_set_out_pins(&c, pin,3);
+	sm_config_set_set_pins(&c, pin,3);
+	sm_config_set_out_shift(&c,true,true,32); // shift right
+	sm_config_set_jmp_pin(&c,5);
+    sm_config_set_clkdiv(&c, 1);
+//    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+}
+
+%}
